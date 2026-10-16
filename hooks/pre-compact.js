@@ -1,8 +1,7 @@
 import { text } from "node:stream/consumers";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { STATE_DIR, stateFile, log, fileExists } from "./lib/state.js";
+import { stateFile, log, fileExists, readState, writeState } from "./lib/state.js";
+import { ensureDeps } from "./lib/deps.js";
 import { parseTranscript } from "./lib/transcript.js";
-import { compact } from "./lib/morph.js";
 
 async function hookPreCompact() {
   const input = JSON.parse(await text(process.stdin));
@@ -17,18 +16,26 @@ async function hookPreCompact() {
     throw new Error(`transcript not found: ${input.transcript_path}`);
   }
 
-  await mkdir(STATE_DIR, { recursive: true });
-
   const sf = stateFile(input.session_id);
-  if (await fileExists(sf)) {
-    const prev = JSON.parse(await readFile(sf, "utf-8"));
-    if (prev.summary) {
-      log("PreCompact: cached summary found, skipping API call");
-      return;
-    }
+  const prev = await readState(sf);
+  if (prev?.summary) {
+    log("PreCompact: cached summary found, skipping API call");
+    return;
   }
 
   try {
+    if (!ensureDeps()) {
+      throw new Error(
+        "@morphllm/morphsdk is not installed and automatic install failed " +
+        "(needs npm, pnpm or bun on PATH). Run `npm install --omit=dev` " +
+        "inside the plugin directory.",
+      );
+    }
+    // Imported lazily so the hook can bootstrap node_modules first, and so a
+    // missing API key is reported through the state file rather than crashing
+    // at module load.
+    const { compact } = await import("./lib/morph.js");
+
     const messages = await parseTranscript(input.transcript_path);
     const inputChars = messages.reduce((n, m) => n + m.content.length, 0);
     log(`PreCompact: parsed ${messages.length} messages (${inputChars} chars), calling Morph API...`);
@@ -40,21 +47,18 @@ async function hookPreCompact() {
 
     log(`PreCompact: compaction complete in ${durationMs}ms — ${inputChars} → ${summary.length} chars (${ratio}% ratio)`);
 
-    const state = {
+    await writeState(sf, {
       summary,
       warn: false,
       stats: { messageCount: messages.length, inputChars, outputChars: summary.length, durationMs },
-    };
-
-    await writeFile(sf, JSON.stringify(state));
+    });
   } catch (e) {
     log(`PreCompact: error — ${e.message}`);
-    const state = {
+    await writeState(sf, {
       summary: "",
       warn: false,
       error: e.message,
-    };
-    await writeFile(sf, JSON.stringify(state));
+    });
   }
 }
 

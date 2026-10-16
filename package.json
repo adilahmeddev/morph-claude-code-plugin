@@ -4,6 +4,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@morphllm/morphsdk": "^0.2.157"
+    "@morphllm/morphsdk": "^0.2.157",
+    "ai": "^6.0.0",
+    "zod": "^3.23.0"
   }
 }

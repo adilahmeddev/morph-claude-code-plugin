@@ -1,6 +1,7 @@
 import { text } from "node:stream/consumers";
-import { readFile, unlink } from "node:fs/promises";
-import { stateFile, log, fileExists, emitContext } from "./lib/state.js";
+import { unlink } from "node:fs/promises";
+import { stateFile, log, fileExists, readState, emitContext } from "./lib/state.js";
+import { ensureDeps } from "./lib/deps.js";
 
 async function hookSessionStart() {
   const input = JSON.parse(await text(process.stdin));
@@ -14,7 +15,11 @@ async function hookSessionStart() {
     return;
   }
 
-  const state = JSON.parse(await readFile(sf, "utf-8"));
+  const state = await readState(sf);
+  if (!state) {
+    log("SessionStart: state file unreadable, nothing to inject");
+    return;
+  }
   log(`SessionStart: state=${JSON.stringify({ error: state.error, summaryLen: state.summary?.length ?? 0, stats: state.stats })}`);
 
   if (state.error) {
@@ -52,3 +57,12 @@ await hookSessionStart().catch((e) =>
     `morph-compact: session-start: ${e.message}\n`,
   ),
 );
+
+// Warm the dependency install on session start (no-op once installed) so the
+// first compaction does not pay the npm install cost inside its own timeout.
+// Failure here is non-fatal: injection above has already happened.
+try {
+  ensureDeps();
+} catch (e) {
+  log(`SessionStart: dependency warm-up failed — ${e.message}`);
+}

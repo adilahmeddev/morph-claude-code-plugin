@@ -14,11 +14,21 @@ function extractText(content) {
       case "tool_use":
         if (block.name) parts.push(`[tool: ${block.name}]`);
         break;
-      case "tool_result":
-        if (typeof block.input === "string" && block.input) {
-          parts.push(`[result]: ${block.input}`);
+      case "tool_result": {
+        // tool_result carries its payload in `content` (string | block[]);
+        // `input` only exists on tool_use blocks.
+        const c = block.content;
+        if (typeof c === "string") {
+          if (c) parts.push(`[result]: ${c}`);
+        } else if (Array.isArray(c)) {
+          for (const inner of c) {
+            if (inner?.type === "text" && inner.text) {
+              parts.push(`[result]: ${inner.text}`);
+            }
+          }
         }
         break;
+      }
     }
   }
   return parts.join("\n");
@@ -28,7 +38,9 @@ export async function parseTranscript(path) {
   const text = await readFile(path, "utf-8");
   const messages = [];
 
-  for (const line of text.split("\n")) {
+  // Transcripts written on Windows may use CRLF line endings.
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
     if (!line) continue;
 
     let tl;

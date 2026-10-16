@@ -7,6 +7,8 @@ allowed-tools: [Read, Edit, Glob, Bash, AskUserQuestion]
 
 # Uninstall Morph Compact
 
+`~` means the user's home directory: `$HOME` on macOS/Linux, `%USERPROFILE%` on Windows. Resolve it to an absolute path before using the Read/Edit tools.
+
 ## Step 1: CLAUDE.md
 
 Find and remove the "# Compact Instructions" section from the global `~/.claude/CLAUDE.md` file, but only if it contains the text "Summary of previous conversation in SessionStart hook" (confirming it was added by this plugin).

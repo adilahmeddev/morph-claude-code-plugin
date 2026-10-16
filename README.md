@@ -38,6 +38,13 @@ To remove:
 
 The API key can also be provided via the `MORPH_API_KEY` environment variable, which takes precedence over the file.
 
+### Requirements
+
+- Node.js 18 or newer on your `PATH`, plus one of `npm`, `pnpm` or `bun`. The hooks are plain Node scripts; the one runtime dependency (`@morphllm/morphsdk`) is installed into the plugin directory automatically the first time a hook runs, using the first of those package managers found, and skipped on every run after that. Set `MORPH_PACKAGE_MANAGER=npm|pnpm|bun` to force one.
+- Works on macOS, Linux and Windows. On Windows the hooks run under Git Bash if it is installed, otherwise PowerShell; no POSIX shell features are required either way. The key file lives at `%USERPROFILE%\.claude\morph\.env`.
+
+Tunables (environment variables): `MORPH_COMPACT_TIMEOUT` (ms, default 60000), `MORPH_COMPACT_RATIO` (default 0.3), `MORPH_COMPACT_PRESERVE_RECENT` (default 1).
+
 ### Limitations
 
 Due to limitations with Claude Code's hooks, we are unable to alter the output of a compaction.
