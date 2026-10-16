@@ -43,7 +43,22 @@ The API key can also be provided via the `MORPH_API_KEY` environment variable, w
 - Node.js 18 or newer on your `PATH`, plus one of `npm`, `pnpm` or `bun`. The hooks are plain Node scripts; the one runtime dependency (`@morphllm/morphsdk`) is installed into the plugin directory automatically the first time a hook runs, using the first of those package managers found, and skipped on every run after that. Set `MORPH_PACKAGE_MANAGER=npm|pnpm|bun` to force one.
 - Works on macOS, Linux and Windows. On Windows the hooks run under Git Bash if it is installed, otherwise PowerShell; no POSIX shell features are required either way. The key file lives at `%USERPROFILE%\.claude\morph\.env`.
 
-Tunables (environment variables): `MORPH_COMPACT_TIMEOUT` (ms, default 60000), `MORPH_COMPACT_RATIO` (default 0.3), `MORPH_COMPACT_PRESERVE_RECENT` (default 1).
+### What gets sent to Morph
+
+The hook does not send the raw transcript. Before the API call it:
+
+- keeps only `user` and `assistant` entries (Claude Code also logs its full API request bodies, system prompt included, into the same file);
+- drops subagent traffic, `<system-reminder>` blocks, slash-command envelopes, ANSI colour codes and the post-compaction placeholder message;
+- strips the `N<tab>` line-number prefixes the Read tool adds to file dumps;
+- truncates each tool result to `MORPH_COMPACT_MAX_RESULT_CHARS` (default 3000), keeping the head and tail;
+- records tool calls as `[tool: Name] {input}` with the input capped at `MORPH_COMPACT_MAX_TOOL_INPUT_CHARS` (default 400);
+- merges the several transcript entries that make up one assistant turn back into one message.
+
+On a session that has already been compacted once, only the entries since the last compaction are parsed and the previous Morph summary is prepended, so summaries accumulate and each call works on a small slice.
+
+The compression ratio is capped so the result fits `MORPH_COMPACT_MAX_CONTEXT_CHARS` (default 40000, about 10K tokens). Claude Code does not inline hook output much larger than that; it writes it to a file and shows a short preview instead. If the summary still overshoots, it is cut at the budget and the full text is saved under `<tmp>/compact-hook/<session_id>.full-summary.txt` with a note in the injected context pointing to it.
+
+Tunables (environment variables): `MORPH_COMPACT_TIMEOUT` (ms, default 60000), `MORPH_COMPACT_RATIO` (default 0.3, the ceiling), `MORPH_COMPACT_PRESERVE_RECENT` (default 1), `MORPH_COMPACT_MAX_CONTEXT_CHARS`, `MORPH_COMPACT_MAX_RESULT_CHARS`, `MORPH_COMPACT_MAX_TOOL_INPUT_CHARS`.
 
 ### Debugging
 
@@ -52,8 +67,8 @@ Set `MORPH_COMPACT_DEBUG=1` to persist what each hook saw and produced. Files ar
 | File | Contents |
 | --- | --- |
 | `precompact-input.json` | PreCompact hook stdin |
-| `precompact-messages.json` | parsed transcript sent to the Morph API |
-| `precompact-summary.txt` | summary returned by the Morph API |
+| `precompact-messages.json` | cleaned messages sent to the Morph API |
+| `precompact-summary.txt` | summary returned by the Morph API, before the size cap |
 | `precompact-error.txt` | error message and stack, when compaction failed |
 | `sessionstart-input.json` | SessionStart hook stdin |
 | `sessionstart-context.txt` | the `additionalContext` injected into the new session |

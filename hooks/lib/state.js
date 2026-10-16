@@ -10,6 +10,34 @@ export function stateFile(sessionId) {
   return join(STATE_DIR, String(sessionId).replace(/[^A-Za-z0-9._-]/g, "_"));
 }
 
+/**
+ * Where the last summary injected into a session is kept after the state
+ * file has been consumed. The next PreCompact for the same session reads it
+ * and compacts only what happened since, so summaries accumulate instead of
+ * re-processing the whole transcript every time.
+ */
+export function prevSummaryFile(sessionId) {
+  return `${stateFile(sessionId)}.prev-summary.txt`;
+}
+
+/** Full, untruncated summary when it exceeded the injection budget. */
+export function fullSummaryFile(sessionId) {
+  return `${stateFile(sessionId)}.full-summary.txt`;
+}
+
+export async function readText(path) {
+  try {
+    return await readFile(path, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+export async function writeText(path, data) {
+  await mkdir(STATE_DIR, { recursive: true });
+  await writeFile(path, data, "utf-8");
+}
+
 export function log(msg) {
   process.stderr.write(`[morph-compact] ${msg}\n`);
 }

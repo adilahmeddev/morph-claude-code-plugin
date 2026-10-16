@@ -1,6 +1,8 @@
 import { text } from "node:stream/consumers";
 import { unlink } from "node:fs/promises";
-import { stateFile, log, fileExists, readState, emitContext } from "./lib/state.js";
+import {
+  stateFile, prevSummaryFile, log, fileExists, readState, emitContext, writeText,
+} from "./lib/state.js";
 import { ensureDeps } from "./lib/deps.js";
 import { debugDump } from "./lib/debug.js";
 
@@ -52,6 +54,11 @@ async function hookSessionStart() {
 
   await debugDump(input.session_id, "sessionstart-context.txt", data);
   emitContext("SessionStart", data);
+  // Keep a copy so the next compaction of this session can build on it
+  // instead of re-reading the whole transcript.
+  await writeText(prevSummaryFile(input.session_id), data).catch((e) =>
+    log(`SessionStart: could not save previous summary — ${e.message}`),
+  );
   await unlink(sf).catch(() => {});
 }
 
