@@ -45,6 +45,21 @@ The API key can also be provided via the `MORPH_API_KEY` environment variable, w
 
 Tunables (environment variables): `MORPH_COMPACT_TIMEOUT` (ms, default 60000), `MORPH_COMPACT_RATIO` (default 0.3), `MORPH_COMPACT_PRESERVE_RECENT` (default 1).
 
+### Debugging
+
+Set `MORPH_COMPACT_DEBUG=1` to persist what each hook saw and produced. Files are written per session under `<tmp>/compact-hook/debug/<session_id>/` (override the root with `MORPH_COMPACT_DEBUG_DIR`):
+
+| File | Contents |
+| --- | --- |
+| `precompact-input.json` | PreCompact hook stdin |
+| `precompact-messages.json` | parsed transcript sent to the Morph API |
+| `precompact-summary.txt` | summary returned by the Morph API |
+| `precompact-error.txt` | error message and stack, when compaction failed |
+| `sessionstart-input.json` | SessionStart hook stdin |
+| `sessionstart-context.txt` | the `additionalContext` injected into the new session |
+
+Debug files are never deleted automatically. Hook log lines (prefixed `[morph-compact]`) go to stderr and are visible with `claude --debug`.
+
 ### Limitations
 
 Due to limitations with Claude Code's hooks, we are unable to alter the output of a compaction.

@@ -2,12 +2,14 @@ import { text } from "node:stream/consumers";
 import { unlink } from "node:fs/promises";
 import { stateFile, log, fileExists, readState, emitContext } from "./lib/state.js";
 import { ensureDeps } from "./lib/deps.js";
+import { debugDump } from "./lib/debug.js";
 
 async function hookSessionStart() {
   const input = JSON.parse(await text(process.stdin));
   if (!input.session_id) throw new Error("no session_id in hook input");
 
   log(`SessionStart: source=${input.source} session=${input.session_id}`);
+  await debugDump(input.session_id, "sessionstart-input.json", input);
 
   const sf = stateFile(input.session_id);
   if (!(await fileExists(sf))) {
@@ -24,11 +26,11 @@ async function hookSessionStart() {
 
   if (state.error) {
     log(`SessionStart: injecting error — ${state.error}`);
-    emitContext(
-      "SessionStart",
+    const context =
       "ERROR: Morph compaction failed: " + state.error + "\n" +
-      "Inform the user about this error. Context from the previous conversation was NOT preserved.",
-    );
+      "Inform the user about this error. Context from the previous conversation was NOT preserved.";
+    await debugDump(input.session_id, "sessionstart-context.txt", context);
+    emitContext("SessionStart", context);
     await unlink(sf).catch(() => {});
     return;
   }
@@ -48,6 +50,7 @@ async function hookSessionStart() {
     log(`SessionStart: injecting summary (${data.length} chars)`);
   }
 
+  await debugDump(input.session_id, "sessionstart-context.txt", data);
   emitContext("SessionStart", data);
   await unlink(sf).catch(() => {});
 }
